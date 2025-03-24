@@ -1,0 +1,14 @@
+# Interval in seconds between each check for bee spawning at beehives.
+checkIntervalSeconds: 600
+
+# Cooldown in seconds between bee spawns at the same beehive.
+cooldown: 600
+
+# Maximum number of bees that can spawn per interval.
+maxBeesPerInterval: 3
+
+# Time in seconds before the bee spawn count resets.
+interval: 3600
+
+# Maximum number of bees allowed in a beehive before spawning is allowed.
+maxBeesInHive: 0

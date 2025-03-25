@@ -4,7 +4,3 @@ api-version: 1.21
 authors: [HasJamOn, Bahm]
 version: 1.0
 description: Regenerates bees in hives that are missing them.
-commands:
-  beespawn:
-    description: Command to manage bee spawning
-    usage: /<command> reload

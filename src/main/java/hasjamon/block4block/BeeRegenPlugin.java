@@ -100,26 +100,4 @@ public class BeeRegenPlugin extends JavaPlugin {
         // Bees naturally return to their hive; no need to set a home location manually.
     }
 
-    // Command to reload the config (e.g., /beespawn reload)
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (command.getName().equalsIgnoreCase("beespawn")) {
-            if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
-                reloadConfig();
-                // Reload all configuration values
-                cooldownMillis = getConfig().getLong("cooldown", 60) * 1000;
-                maxBeesPerInterval = getConfig().getInt("maxBeesPerInterval", 3);
-                intervalMillis = getConfig().getLong("interval", 3600) * 1000;
-                maxBeesInHive = getConfig().getInt("maxBeesInHive", 0);
-                long checkIntervalSeconds = getConfig().getLong("checkIntervalSeconds", 10);
-                checkIntervalTicks = checkIntervalSeconds * 20;
-
-                sender.sendMessage("BeeRegenPlugin config reloaded!");
-                return true;
-            }
-            sender.sendMessage("Usage: /beespawn reload");
-            return true;
-        }
-        return false;
-    }
 }

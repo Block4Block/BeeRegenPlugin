@@ -2,85 +2,102 @@ package hasjamon.block4block;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.block.Beehive;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Bee;
 import org.bukkit.entity.EntityType;
-import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 public class BeeRegenPlugin extends JavaPlugin {
 
-    // Original cooldown time in milliseconds (configured in config.yml, default is 60 seconds)
-    private long cooldownMillis;
-    // New configuration options
+    // Beehive-related config options (all in ticks)
+    private long cooldownTicks;
     private int maxBeesPerInterval;
-    private long intervalMillis;  // interval in milliseconds
+    private long spawnIntervalTicks;
     private int maxBeesInHive;
-
-    // Configurable check interval in ticks for the runTaskTimer
     private long checkIntervalTicks;
 
-    // Map to keep track of each block's last spawn timestamp. Key: world:x:y:z
+    // Despawn time in ticks
+    private long despawnTicks;
+    private NamespacedKey despawnKey;
+
+    // Global tick counter
+    private long tickCounter = 0;
+
+    // Maps for tracking hive and spawn information
     private final Map<String, Long> blockCooldowns = new HashMap<>();
-    // Map to track the number of bees spawned per beehive in the current interval
     private final Map<String, Integer> beesSpawnedCount = new HashMap<>();
-    // Map to track when the current interval started for each beehive
     private final Map<String, Long> spawnIntervalReset = new HashMap<>();
 
     @Override
     public void onEnable() {
-        // Save the default config if one is not present
         saveDefaultConfig();
+        FileConfiguration config = getConfig();
 
-        // Read configuration values:
-        cooldownMillis = getConfig().getLong("cooldown", 60) * 1000;
-        maxBeesPerInterval = getConfig().getInt("maxBeesPerInterval", 3);
-        intervalMillis = getConfig().getLong("interval", 3600) * 1000;
-        maxBeesInHive = getConfig().getInt("maxBeesInHive", 0);
+        // Load all configuration values in ticks
+        checkIntervalTicks = config.getLong("checkIntervalTicks", 12000);
+        cooldownTicks = config.getLong("cooldownTicks", 12000);
+        maxBeesPerInterval = config.getInt("maxBeesPerInterval", 3);
+        spawnIntervalTicks = config.getLong("spawnIntervalTicks", 72000);
+        maxBeesInHive = config.getInt("maxBeesInHive", 0);
+        despawnTicks = config.getLong("despawnTicks", 6000);
 
-        // Read the check interval in seconds from config and convert to ticks (20 ticks per second)
-        long checkIntervalSeconds = getConfig().getLong("checkIntervalSeconds", 10);
-        checkIntervalTicks = checkIntervalSeconds * 20;
+        // Key to store and retrieve despawn tick info from bees
+        despawnKey = new NamespacedKey(this, "despawnTick");
 
-        // Start periodic task to check all Bee Nests and Beehives using the configurable interval
+        // Start a task to increment the global tick counter
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                tickCounter++;
+            }
+        }.runTaskTimer(this, 1L, 1L); // Start after 1 tick, run every tick
+
+        // Start a task to check beehives for spawning bees
         new BukkitRunnable() {
             @Override
             public void run() {
                 checkBeehives();
             }
-        }.runTaskTimer(this, 0, checkIntervalTicks);
+        }.runTaskTimer(this, 0L, checkIntervalTicks);
 
-        getLogger().info("BeeRegenPlugin enabled!");
+        // Start a task to check for bee despawn conditions
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                checkForBeeDespawn();
+            }
+        }.runTaskTimer(this, 0L, checkIntervalTicks);
+
+        getLogger().info("BeeRegenPlugin enabled! Using tick-based timing.");
     }
 
     private void checkBeehives() {
-        // Iterate over all loaded chunks in the primary world
         for (var chunk : getServer().getWorlds().get(0).getLoadedChunks()) {
             for (var block : chunk.getTileEntities()) {
                 if (block instanceof Beehive) {
                     Beehive beehive = (Beehive) block;
                     String key = block.getLocation().toString();
-                    long currentTime = System.currentTimeMillis();
 
                     // Reset the spawn count if the interval has passed
-                    if (!spawnIntervalReset.containsKey(key) || (currentTime - spawnIntervalReset.get(key)) >= intervalMillis) {
-                        spawnIntervalReset.put(key, currentTime);
+                    if (!spawnIntervalReset.containsKey(key) || (tickCounter - spawnIntervalReset.get(key)) >= spawnIntervalTicks) {
+                        spawnIntervalReset.put(key, tickCounter);
                         beesSpawnedCount.put(key, 0);
                     }
 
-                    // Check if the beehive is below the configured bee threshold.
-                    // For maxBeesInHive = 0, this will only spawn if there are no bees.
+                    // Check if the beehive has fewer than the allowed number of bees
                     if (beehive.getEntityCount() <= maxBeesInHive) {
                         int count = beesSpawnedCount.getOrDefault(key, 0);
-                        // If we haven't reached the maximum bees spawned per interval
                         if (count < maxBeesPerInterval) {
                             // Check if the cooldown has passed for this beehive
-                            if (!blockCooldowns.containsKey(key) || (currentTime - blockCooldowns.get(key)) >= cooldownMillis) {
+                            if (!blockCooldowns.containsKey(key) || (tickCounter - blockCooldowns.get(key)) >= cooldownTicks) {
                                 spawnBee(block.getLocation());
-                                blockCooldowns.put(key, currentTime);
+                                blockCooldowns.put(key, tickCounter);
                                 beesSpawnedCount.put(key, count + 1);
                             }
                         }
@@ -94,10 +111,31 @@ public class BeeRegenPlugin extends JavaPlugin {
         // Create a bee slightly above the hive/nest to avoid suffocation
         Location spawnLocation = location.add(0.5, 1, 0.5);
         Bee bee = (Bee) location.getWorld().spawnEntity(spawnLocation, EntityType.BEE);
-
-        // Make the bee persistent so it won't disappear and remains close to the beehive
         bee.setPersistent(true);
-        // Bees naturally return to their hive; no need to set a home location manually.
+
+        // Tag the bee with the current tick count for future despawn checks
+        bee.getPersistentDataContainer().set(despawnKey, PersistentDataType.LONG, tickCounter);
     }
 
+    private void checkForBeeDespawn() {
+        // Iterate through all worlds and check all bees
+        for (var world : getServer().getWorlds()) {
+            for (Bee bee : world.getEntitiesByClass(Bee.class)) {
+                if (despawnTicks > 0) { // Only apply despawn logic if the value is > 0
+                    // Get the bee's spawn tick from the PersistentDataContainer
+                    if (bee.getPersistentDataContainer().has(despawnKey, PersistentDataType.LONG)) {
+                        long spawnTick = bee.getPersistentDataContainer().get(despawnKey, PersistentDataType.LONG);
+                        // Despawn if the lifespan has been exceeded
+                        if ((tickCounter - spawnTick) >= despawnTicks) {
+                            bee.remove();
+                            getLogger().info("Despawned bee at " + bee.getLocation() + " after " + (tickCounter - spawnTick) + " ticks.");
+                        }
+                    } else {
+                        // If the bee was not tagged properly, tag it now
+                        bee.getPersistentDataContainer().set(despawnKey, PersistentDataType.LONG, tickCounter);
+                    }
+                }
+            }
+        }
+    }
 }

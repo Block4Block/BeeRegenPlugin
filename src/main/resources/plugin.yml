@@ -2,5 +2,5 @@ name: BeeRegenPlugin
 main: hasjamon.block4block.BeeRegenPlugin
 api-version: 1.21
 authors: [HasJamOn, Bahm]
-version: 1.0
-description: Regenerates bees in hives that are missing them and despawns bees after a set number of ticks.
+version: 1.1
+description: Regenerates bees in hives that are missing them and despawns bees after a set lifespan or if lost.

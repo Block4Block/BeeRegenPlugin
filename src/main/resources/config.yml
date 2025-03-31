@@ -1,7 +1,5 @@
-#Game running on 20 ticks estimated time guide:
-#1 second = 20 ticks
-#1 minute = 1200 ticks
-#1 hour = 72000 ticks
+# Game running on 20 ticks per second:
+# 1 second = 20 ticks, 1 minute = 1200 ticks, 1 hour = 72000 ticks
 
 # Interval in ticks between each check for bee spawning at beehives.
 checkIntervalTicks: 12000
@@ -18,5 +16,16 @@ spawnIntervalTicks: 72000
 # Maximum number of bees allowed in a beehive before spawning is allowed.
 maxBeesInHive: 0
 
-# Lifespan of a bee in ticks (0 means they never despawn).
+# Lifespan of a bee in ticks (0 means they never despawn normally).
 despawnTicks: 6000
+
+# Lost Bee Despawn Options:
+lostDespawnEnabled: true
+# Number of ticks a bee may remain lost before despawning.
+lostDespawnTicks: 6000
+# Maximum distance (in blocks) from the bee's "home" that it is allowed.
+maxDistanceFromHome: 20
+# If enabled, before despawning a lost bee, check the area for any nearby hives or nests.
+lostDespawnCheckNearbyHives: true
+# Search range (in blocks) for nearby hives or nests.
+lostDespawnNearbyRange: 5
